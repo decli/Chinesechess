@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中国象棋 - 人机对战</title>
+    <meta name="description" content="中国象棋在线对战，支持5级AI难度、悔棋、提示、进度保存，界面简洁友好。">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♟</text></svg>">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- 标题 -->
+        <header class="header">
+            <h1>中 国 象 棋</h1>
+            <p class="subtitle">人 机 对 战</p>
+        </header>
+
+        <!-- 主体 -->
+        <main class="main-content">
+            <!-- 棋盘 -->
+            <div class="board-container">
+                <canvas id="board-canvas" width="592" height="656"></canvas>
+            </div>
+
+            <!-- 侧边栏 -->
+            <aside class="sidebar">
+                <!-- 状态 -->
+                <div class="card">
+                    <div class="card-title">对局状态</div>
+                    <div class="turn-indicator-wrapper">
+                        <div id="turn-dot" class="turn-dot red"></div>
+                        <span id="turn-indicator">红方走棋</span>
+                    </div>
+                </div>
+
+                <!-- 设置 -->
+                <div class="card">
+                    <div class="card-title">游戏设置</div>
+                    <div class="settings-row">
+                        <label class="settings-label" for="level-select">AI 难度</label>
+                        <select id="level-select" class="settings-select">
+                            <option value="1">⭐ 入门</option>
+                            <option value="2">⭐⭐ 初级</option>
+                            <option value="3" selected>⭐⭐⭐ 中级</option>
+                            <option value="4">⭐⭐⭐⭐ 高级</option>
+                            <option value="5">⭐⭐⭐⭐⭐ 大师</option>
+                        </select>
+                    </div>
+                    <div class="settings-row">
+                        <label class="settings-label" for="side-select">执子</label>
+                        <select id="side-select" class="settings-select">
+                            <option value="1" selected>执红先行</option>
+                            <option value="-1">执黑后行</option>
+                        </select>
+                    </div>
+                    <div class="settings-row">
+                        <label class="settings-label" for="sound-toggle">语音播报</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="sound-toggle" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="card">
+                    <div class="card-title">操作</div>
+                    <div class="btn-group">
+                        <button id="btn-new-game" class="btn btn-primary">
+                            <span class="btn-icon">🔄</span> 新游戏
+                        </button>
+                        <button id="btn-undo" class="btn">
+                            <span class="btn-icon">↩️</span> 悔棋
+                        </button>
+                        <button id="btn-hint" class="btn">
+                            <span class="btn-icon">💡</span> 提示
+                        </button>
+                        <button id="btn-save" class="btn">
+                            <span class="btn-icon">💾</span> 保存
+                        </button>
+                        <button id="btn-load" class="btn btn-full">
+                            <span class="btn-icon">📂</span> 加载存档
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 走法记录 -->
+                <div class="card">
+                    <div class="card-title">走法记录</div>
+                    <ul id="move-list" class="move-list">
+                        <li class="move-list-empty">等待开局...</li>
+                    </ul>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- ========== 对话框 ========== -->
+
+    <!-- 新游戏确认 -->
+    <div id="new-game-dialog" class="dialog-overlay">
+        <div class="dialog">
+            <div class="dialog-header">
+                <h2 class="dialog-title">开始新游戏</h2>
+                <button class="dialog-close" aria-label="关闭">&times;</button>
+            </div>
+            <div class="dialog-body">
+                <p>当前棋局将会丢失，确定要开始新游戏吗？</p>
+            </div>
+            <div class="dialog-actions">
+                <button id="cancel-new-game" class="btn">取消</button>
+                <button id="confirm-new-game" class="btn btn-primary">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 保存对话框 -->
+    <div id="save-dialog" class="dialog-overlay">
+        <div class="dialog">
+            <div class="dialog-header">
+                <h2 class="dialog-title">保存棋局</h2>
+                <button class="dialog-close" aria-label="关闭">&times;</button>
+            </div>
+            <div class="dialog-body">
+                <div class="save-slots">
+                    <button id="save-slot-0" class="slot-btn">
+                        <span class="slot-title">存档 1</span>
+                        <span class="slot-info">空</span>
+                    </button>
+                    <button id="save-slot-1" class="slot-btn">
+                        <span class="slot-title">存档 2</span>
+                        <span class="slot-info">空</span>
+                    </button>
+                    <button id="save-slot-2" class="slot-btn">
+                        <span class="slot-title">存档 3</span>
+                        <span class="slot-info">空</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载对话框 -->
+    <div id="load-dialog" class="dialog-overlay">
+        <div class="dialog">
+            <div class="dialog-header">
+                <h2 class="dialog-title">加载棋局</h2>
+                <button class="dialog-close" aria-label="关闭">&times;</button>
+            </div>
+            <div class="dialog-body">
+                <div class="save-slots">
+                    <button id="load-slot-0" class="slot-btn">
+                        <span class="slot-title">存档 1</span>
+                        <span class="slot-info">空</span>
+                    </button>
+                    <button id="load-slot-1" class="slot-btn">
+                        <span class="slot-title">存档 2</span>
+                        <span class="slot-info">空</span>
+                    </button>
+                    <button id="load-slot-2" class="slot-btn">
+                        <span class="slot-title">存档 3</span>
+                        <span class="slot-info">空</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 游戏结束 -->
+    <div id="gameover-dialog" class="dialog-overlay">
+        <div class="dialog">
+            <div class="dialog-header">
+                <h2 class="dialog-title">游戏结束</h2>
+                <button class="dialog-close" aria-label="关闭">&times;</button>
+            </div>
+            <div class="dialog-body">
+                <p id="gameover-message" class="gameover-message"></p>
+            </div>
+            <div class="dialog-actions">
+                <button id="gameover-close" class="btn">关闭</button>
+                <button id="gameover-new" class="btn btn-primary">新游戏</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 脚本 (顺序重要) -->
+    <script src="js/rules.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/board.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/main.js"></script>
+</body>
+
+</html>
