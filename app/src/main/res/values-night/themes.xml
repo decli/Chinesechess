@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ChineseChess" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">#CC3333</item>
+        <item name="colorPrimaryDark">#991111</item>
+        <item name="colorAccent">#CC8800</item>
+        <item name="android:windowBackground">#F5E6C8</item>
+        <item name="android:statusBarColor">#8B4513</item>
+        <item name="android:navigationBarColor">#8B4513</item>
+    </style>
+</resources>

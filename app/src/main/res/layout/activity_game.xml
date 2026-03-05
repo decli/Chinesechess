@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#F5E6C8">
+
+    <!-- Top status bar -->
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="4dp"
+        android:background="#E8D5B0">
+
+        <TextView
+            android:id="@+id/tvBlackName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="电脑 (黑方)"
+            android:textSize="18sp"
+            android:textColor="#1A1A1A"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="红方走棋"
+            android:textSize="20sp"
+            android:textColor="#CC3333"
+            android:textStyle="bold"
+            android:paddingHorizontal="16dp" />
+
+        <TextView
+            android:id="@+id/tvRedName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="玩家 (红方)"
+            android:textSize="18sp"
+            android:textColor="#CC3333"
+            android:textStyle="bold"
+            android:gravity="end" />
+    </LinearLayout>
+
+    <!-- Chess board - takes maximum space -->
+    <com.chinesechess.game.ui.ChessBoardView
+        android:id="@+id/chessBoardView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- AI speech bubble -->
+    <TextView
+        android:id="@+id/tvAiSpeech"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textSize="16sp"
+        android:textColor="#333333"
+        android:background="#EEDDBB"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="6dp"
+        android:gravity="center"
+        android:visibility="gone"
+        android:minHeight="36dp" />
+
+    <!-- Bottom control buttons -->
+    <LinearLayout
+        android:id="@+id/bottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:paddingVertical="8dp"
+        android:paddingHorizontal="8dp"
+        android:background="#E8D5B0">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnUndo"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_weight="1"
+            android:text="悔棋"
+            android:textSize="17sp"
+            android:layout_marginEnd="4dp"
+            app:strokeColor="#8B4513"
+            android:textColor="#8B4513"
+            app:cornerRadius="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnHint"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_weight="1"
+            android:text="提示"
+            android:textSize="17sp"
+            android:layout_marginEnd="4dp"
+            app:strokeColor="#8B4513"
+            android:textColor="#8B4513"
+            app:cornerRadius="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnNewGame"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_weight="1"
+            android:text="新局"
+            android:textSize="17sp"
+            android:layout_marginEnd="4dp"
+            app:strokeColor="#8B4513"
+            android:textColor="#8B4513"
+            app:cornerRadius="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSound"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_weight="1"
+            android:text="音效"
+            android:textSize="17sp"
+            app:strokeColor="#8B4513"
+            android:textColor="#8B4513"
+            app:cornerRadius="8dp" />
+
+    </LinearLayout>
+
+</LinearLayout>

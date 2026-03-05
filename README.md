@@ -1,79 +1,103 @@
-# ♟ 中国象棋 - 在线人机对战
+# 中国象棋 Android App
 
-一款纯前端中国象棋游戏，支持 AI 人机对战、5级难度、悔棋、提示、语音播报、进度保存，界面对老人友好。
+一款经典中国象棋 Android 应用，支持人机对战和双人对战，界面对老人友好，适配大屏平板（14寸）。
 
-🎮 **在线体验**: [https://decli.github.io/Chinesechess/](https://decli.github.io/Chinesechess/)
-
-![中国象棋截图](https://img.shields.io/badge/中国象棋-在线对战-red?style=for-the-badge)
-
-## ✨ 功能特性
+## 功能特性
 
 | 功能 | 说明 |
 |------|------|
-| 🤖 **AI 对战** | Alpha-Beta 剪枝算法，Web Worker 中运行不阻塞 UI |
-| ⭐ **5级难度** | 入门 → 初级 → 中级 → 高级 → 大师 |
-| ↩️ **悔棋** | AI 模式自动回退两步（一个完整回合） |
-| 💡 **提示** | 紫色箭头显示推荐走法 |
-| 🔊 **语音播报** | 每步棋用中文语音播报（如"红方，马八进七"） |
-| 💾 **保存/加载** | 3个存档槽位 + 自动保存（关闭页面再打开自动恢复） |
-| 📝 **走法记录** | 标准中文棋谱记法实时记录 |
-| 👴 **老人友好** | 大字体(18-22px)、大按钮(52px)、高对比度暗色主题 |
-| 📱 **响应式** | 桌面横排布局，移动端自适应竖排 |
-| 🔄 **执子切换** | 可选执红先行或执黑后行 |
+| **AI 对战** | Alpha-Beta 剪枝 + 迭代加深搜索，带时间限制，不会卡死 |
+| **三级难度** | 初级（休闲）、中级（默认）、高级（挑战） |
+| **双人对战** | 支持两人在同一设备上对弈 |
+| **悔棋** | 每局最多5次悔棋，AI模式自动回退两步 |
+| **走法提示** | 一键获取AI推荐走法，橙色高亮显示 |
+| **落子音效** | 走子、吃子、将军、胜利各有不同音效 |
+| **AI语音播报** | 机器人走棋时播报幽默语音（使用TTS） |
+| **全屏模式** | 隐藏系统栏，棋盘上下撑满屏幕 |
+| **老人友好** | 大字体、大按钮、高对比度、简洁界面 |
+| **合法走子** | 自动显示可走位置，防止误操作 |
 
-## 🎯 象棋规则
+## 象棋规则
 
 完整实现中国象棋全部规则：
 - 7种棋子走法（帅/将、仕/士、相/象、马、车、炮、兵/卒）
 - 蹩马腿、塞象眼检测
-- 将帅不能面对面（会面检测）
+- 将帅不能面对面（飞将检测）
 - 将军、将杀、困毙判定
-- 走后不能被将的合法性验证
+- 走后不能自将的合法性验证
 
-## 🛠 技术架构
+## AI 算法
+
+- **搜索算法**: Alpha-Beta 剪枝 + 迭代加深
+- **时间控制**: 每个难度有独立的搜索深度和时间限制，保证不会卡死
+  - 初级：搜索2层，限时1秒
+  - 中级：搜索4层，限时3秒
+  - 高级：搜索6层，限时5秒
+- **走法排序**: MVV-LVA（最有价值受害者-最低价值攻击者）+ 将军优先
+- **评估函数**: 棋子价值 + 位置价值表 + 机动性评估
+
+## 技术架构
+
+- **语言**: Kotlin
+- **最低版本**: Android 8.0 (API 26)
+- **目标版本**: Android 15 (API 35)
+- **UI框架**: 自定义 View + ViewBinding
+- **AI计算**: Kotlin 协程在后台线程执行，不阻塞UI
+- **音效**: SoundPool + TextToSpeech
+- **构建**: Gradle 8.9 + AGP 8.7.0
+
+## 项目结构
 
 ```
-纯静态 HTML + CSS + JavaScript，无需后端
+app/src/main/
+├── java/com/chinesechess/game/
+│   ├── engine/              # 棋局引擎
+│   │   ├── ChessConstants.kt   # 常量定义
+│   │   ├── ChessBoard.kt       # 棋盘状态管理
+│   │   ├── Move.kt             # 走法数据类
+│   │   ├── MoveValidator.kt    # 走法验证
+│   │   └── MoveGenerator.kt    # 走法生成
+│   ├── ai/                  # AI引擎
+│   │   └── ChessAI.kt          # Alpha-Beta搜索
+│   ├── ui/                  # 界面
+│   │   ├── MainActivity.kt     # 主菜单
+│   │   ├── GameActivity.kt     # 游戏界面
+│   │   └── ChessBoardView.kt   # 棋盘绘制
+│   └── audio/               # 音效
+│       ├── SoundManager.kt     # 音效管理
+│       └── SoundGenerator.kt   # 音效生成
+├── res/
+│   ├── layout/              # 布局文件
+│   ├── raw/                 # 音效文件
+│   ├── values/              # 主题和字符串
+│   └── drawable/            # 图标
+└── AndroidManifest.xml
 ```
 
-- **渲染**: HTML5 Canvas 木纹风格棋盘
-- **AI**: Minimax + Alpha-Beta 剪枝 + 位置价值表，运行在 Web Worker
-- **存储**: localStorage
-- **语音**: Web Speech API (浏览器原生)
-- **部署**: GitHub Pages / Cloudflare Pages
-
-## 📁 项目结构
-
-```
-├── index.html          # 主页面
-├── css/
-│   └── style.css       # 暗色主题样式
-├── js/
-│   ├── rules.js        # 规则引擎
-│   ├── game.js         # 棋局状态管理
-│   ├── board.js        # Canvas 棋盘渲染
-│   ├── ai-worker.js    # AI Web Worker
-│   ├── ai.js           # AI 接口封装
-│   ├── storage.js      # 本地存储
-│   └── main.js         # 主控制器
-└── README.md
-```
-
-## 🚀 本地运行
+## 构建运行
 
 ```bash
 # 克隆仓库
-git clone https://github.com/decli/Chinesechess.git
-cd Chinesechess
+git clone https://github.com/decli/chinesechess02.git
+cd chinesechess02
 
-# 任选其一启动本地服务器
-npx -y http-server ./ -p 8080
-# 或
-python -m http.server 8080
+# 构建 Debug APK
+./gradlew assembleDebug
 
-# 访问 http://localhost:8080
+# 构建 Release APK
+./gradlew assembleRelease
+
+# APK 输出位置
+# Debug: app/build/outputs/apk/debug/app-debug.apk
+# Release: app/build/outputs/apk/release/app-release-unsigned.apk
 ```
 
-## 📄 License
+## 系统要求
+
+- Android 8.0 (API 26) 及以上
+- 适配 Android 15
+- 优化适配 14 寸平板
+
+## License
 
 MIT License
