@@ -617,24 +617,41 @@ class XiangqiApp {
 
         const text = this._generateFunnyComment(moveRecord);
 
-        window.speechSynthesis.cancel();
+        // 等落子音效（约 150ms）播完后再说话，避免 Android 音频焦点冲突
+        setTimeout(() => {
+            const ctx = this._audioCtx;
 
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'zh-CN';
-        utterance.rate = 1.0;
-        utterance.pitch = 1.1;
-        utterance.volume = 1.0;
+            const doSpeak = () => {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'zh-CN';
+                utterance.rate = 1.0;
+                utterance.pitch = 1.1;
+                utterance.volume = 1.0;
 
-        // 使用预缓存的中文语音；若未缓存则再次尝试获取
-        if (this._zhVoice) {
-            utterance.voice = this._zhVoice;
-        } else {
-            const voices = window.speechSynthesis.getVoices();
-            const zh = voices.find(v => v.lang.startsWith('zh'));
-            if (zh) { utterance.voice = zh; this._zhVoice = zh; }
-        }
+                if (this._zhVoice) {
+                    utterance.voice = this._zhVoice;
+                } else {
+                    const voices = window.speechSynthesis.getVoices();
+                    const zh = voices.find(v => v.lang.startsWith('zh'));
+                    if (zh) { utterance.voice = zh; this._zhVoice = zh; }
+                }
 
-        window.speechSynthesis.speak(utterance);
+                // TTS 结束后恢复 AudioContext
+                utterance.onend = utterance.onerror = () => {
+                    if (ctx && ctx.state === 'suspended') ctx.resume();
+                };
+
+                window.speechSynthesis.speak(utterance);
+            };
+
+            // 挂起 AudioContext 以释放 Android 音频焦点，再开始 TTS
+            if (ctx && ctx.state === 'running') {
+                ctx.suspend().then(doSpeak);
+            } else {
+                doSpeak();
+            }
+        }, 300);
     }
 
     _generateFunnyComment(moveRecord) {
