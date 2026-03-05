@@ -16,8 +16,9 @@ class XiangqiApp {
         this.soundEnabled = true; // 语音播报开关
 
         // 音频
-        this._zhVoice = null;  // 预缓存的中文语音
-        this._audioCtx = null; // Web Audio 上下文
+        this._zhVoice = null;       // 预缓存的中文语音
+        this._moveSoundUrl = null;  // 落子 WAV 数据 URI
+        this._captureSoundUrl = null; // 吃子 WAV 数据 URI
 
         // UI 元素引用
         this.canvas = document.getElementById('board-canvas');
@@ -520,6 +521,10 @@ class XiangqiApp {
     // ============== 音频初始化 ==============
 
     _initAudio() {
+        // 预生成落子音效（WAV 数据 URI，避免使用 AudioContext 与 TTS 争抢音频焦点）
+        this._moveSoundUrl = this._buildClickWav(false);
+        this._captureSoundUrl = this._buildClickWav(true);
+
         // 预加载中文语音（语音列表异步加载，需监听 voiceschanged）
         if ('speechSynthesis' in window) {
             const loadVoices = () => {
@@ -530,83 +535,46 @@ class XiangqiApp {
             loadVoices();
             window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
         }
-
-        // 在用户首次交互时初始化 AudioContext（浏览器自动播放策略要求）
-        const initCtx = () => {
-            this._getAudioContext();
-            document.removeEventListener('touchstart', initCtx);
-            document.removeEventListener('click', initCtx);
-        };
-        document.addEventListener('touchstart', initCtx, { once: true, passive: true });
-        document.addEventListener('click', initCtx, { once: true });
     }
 
-    _getAudioContext() {
-        if (!this._audioCtx) {
-            try {
-                this._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            } catch (e) {
-                return null;
-            }
+    // 用 JS 生成 PCM WAV 数据 URI，不依赖 AudioContext
+    _buildClickWav(isCapture) {
+        const sr = 22050;
+        const ms = isCapture ? 130 : 85;
+        const n = Math.floor(sr * ms / 1000);
+        const buf = new ArrayBuffer(44 + n * 2);
+        const v = new DataView(buf);
+        const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+        ws(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true);
+        ws(8, 'WAVE'); ws(12, 'fmt ');
+        v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+        v.setUint16(22, 1, true);  v.setUint32(24, sr, true);
+        v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true);
+        v.setUint16(34, 16, true); ws(36, 'data'); v.setUint32(40, n * 2, true);
+        for (let i = 0; i < n; i++) {
+            const t = i / sr;
+            const nd = Math.exp(-t / (isCapture ? 0.028 : 0.018));
+            const td = Math.exp(-t / (isCapture ? 0.065 : 0.040));
+            const noise = (Math.random() * 2 - 1) * nd * 0.45;
+            const tone  = Math.sin(2 * Math.PI * (isCapture ? 160 : 300) * t) * td * 0.60;
+            v.setInt16(44 + i * 2, Math.max(-32767, Math.min(32767, (noise + tone) * 32767)) | 0, true);
         }
-        if (this._audioCtx.state === 'suspended') {
-            this._audioCtx.resume();
-        }
-        return this._audioCtx;
+        const bytes = new Uint8Array(buf);
+        let b = '';
+        for (let i = 0; i < bytes.length; i++) b += String.fromCharCode(bytes[i]);
+        return 'data:audio/wav;base64,' + btoa(b);
     }
 
     // 棋子落子音效（isCapture: 是否吃子）
     _playMoveSound(isCapture) {
         if (!this.soundEnabled) return;
-        const ctx = this._getAudioContext();
-        if (!ctx) return;
-
-        const now = ctx.currentTime;
-        if (isCapture) {
-            // 吃子：更重的撞击声
-            this._playPercussion(ctx, now, 200, 60, 0.15, 1.0);
-            this._playNoiseHit(ctx, now, 700, 0.4, 0.12);
-        } else {
-            // 落子：清脆的木质敲击声
-            this._playPercussion(ctx, now, 380, 130, 0.09, 0.6);
-            this._playNoiseHit(ctx, now, 1600, 0.22, 0.07);
-        }
-    }
-
-    _playPercussion(ctx, now, freqStart, freqEnd, duration, gain) {
-        const osc = ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freqStart, now);
-        osc.frequency.exponentialRampToValueAtTime(freqEnd, now + duration);
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(gain, now);
-        g.gain.exponentialRampToValueAtTime(0.001, now + duration);
-        osc.connect(g);
-        g.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + duration);
-    }
-
-    _playNoiseHit(ctx, now, filterFreq, gain, duration) {
-        const bufferSize = Math.floor(ctx.sampleRate * duration);
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-            data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 3);
-        }
-        const source = ctx.createBufferSource();
-        source.buffer = buffer;
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.value = filterFreq;
-        filter.Q.value = 1.5;
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(gain, now);
-        source.connect(filter);
-        filter.connect(g);
-        g.connect(ctx.destination);
-        source.start(now);
-        source.stop(now + duration);
+        const url = isCapture ? this._captureSoundUrl : this._moveSoundUrl;
+        if (!url) return;
+        try {
+            const a = new Audio(url);
+            a.volume = isCapture ? 1.0 : 0.75;
+            a.play().catch(() => {});
+        } catch (e) {}
     }
 
     // ============== 语音播报 ==============
@@ -616,42 +584,23 @@ class XiangqiApp {
         if (!('speechSynthesis' in window)) return;
 
         const text = this._generateFunnyComment(moveRecord);
+        window.speechSynthesis.cancel();
 
-        // 等落子音效（约 150ms）播完后再说话，避免 Android 音频焦点冲突
-        setTimeout(() => {
-            const ctx = this._audioCtx;
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-CN';
+        utterance.rate = 1.0;
+        utterance.pitch = 1.1;
+        utterance.volume = 1.0;
 
-            const doSpeak = () => {
-                window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'zh-CN';
-                utterance.rate = 1.0;
-                utterance.pitch = 1.1;
-                utterance.volume = 1.0;
+        if (this._zhVoice) {
+            utterance.voice = this._zhVoice;
+        } else {
+            const voices = window.speechSynthesis.getVoices();
+            const zh = voices.find(v => v.lang.startsWith('zh'));
+            if (zh) { utterance.voice = zh; this._zhVoice = zh; }
+        }
 
-                if (this._zhVoice) {
-                    utterance.voice = this._zhVoice;
-                } else {
-                    const voices = window.speechSynthesis.getVoices();
-                    const zh = voices.find(v => v.lang.startsWith('zh'));
-                    if (zh) { utterance.voice = zh; this._zhVoice = zh; }
-                }
-
-                // TTS 结束后恢复 AudioContext
-                utterance.onend = utterance.onerror = () => {
-                    if (ctx && ctx.state === 'suspended') ctx.resume();
-                };
-
-                window.speechSynthesis.speak(utterance);
-            };
-
-            // 挂起 AudioContext 以释放 Android 音频焦点，再开始 TTS
-            if (ctx && ctx.state === 'running') {
-                ctx.suspend().then(doSpeak);
-            } else {
-                doSpeak();
-            }
-        }, 300);
+        window.speechSynthesis.speak(utterance);
     }
 
     _generateFunnyComment(moveRecord) {
