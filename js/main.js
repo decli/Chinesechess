@@ -581,9 +581,29 @@ class XiangqiApp {
 
     _announceMove(moveRecord) {
         if (!this.soundEnabled) return;
-        if (!('speechSynthesis' in window)) return;
 
         const text = this._generateFunnyComment(moveRecord);
+
+        // Capacitor 原生平台（Android）：WebView 不支持 speechSynthesis，
+        // 使用 @capacitor-community/text-to-speech 插件调用系统原生 TTS
+        if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+            try {
+                const tts = window.Capacitor.Plugins.TextToSpeech;
+                if (tts) {
+                    tts.speak({
+                        text: text,
+                        lang: 'zh-CN',
+                        rate: 1.0,
+                        pitch: 1.1,
+                        volume: 1.0
+                    }).catch(() => {});
+                    return;
+                }
+            } catch (e) {}
+        }
+
+        // Web 浏览器：使用 speechSynthesis（Chrome 等主流浏览器支持）
+        if (!('speechSynthesis' in window)) return;
         window.speechSynthesis.cancel();
 
         const utterance = new SpeechSynthesisUtterance(text);
