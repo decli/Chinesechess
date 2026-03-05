@@ -1,0 +1,89 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [android]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Capacitor
+        run: npm install
+
+      - name: Prepare web assets
+        run: |
+          mkdir -p www
+          cp index.html www/
+          cp -r css www/
+          cp -r js www/
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Sync web assets to Android
+        run: npx cap sync android
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build Debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Rename APK
+        run: |
+          VERSION="v1.0.${{ github.run_number }}"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "ChineseChess-${VERSION}.apk"
+          echo "APK_PATH=ChineseChess-${VERSION}.apk" >> $GITHUB_ENV
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: 中国象棋 APK ${{ env.VERSION }}
+          draft: false
+          prerelease: false
+          files: ${{ env.APK_PATH }}
+          body: |
+            ## 中国象棋 Android APK ${{ env.VERSION }}
+
+            适配 **14 寸平板 / Android 15**
+
+            ### 安装方法
+            1. 在平板上下载下方 APK 文件
+            2. 打开「设置 → 安全 → 安装未知来源应用」，允许文件管理器安装
+            3. 点击已下载的 APK 文件，按提示安装
+
+            ### 功能
+            - 5 级 AI 难度，人机对战
+            - 悔棋、走法提示
+            - 对局进度自动保存
+            - 全屏棋盘，适配大屏平板
+            - 🔊 落子音效：清脆木质敲击声，吃子有更重的撞击声
+            - 🗣️ 语音播报修复：优化语音加载，Android 设备语音播报更稳定
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

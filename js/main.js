@@ -15,6 +15,11 @@ class XiangqiApp {
         this.aiEnabled = true;
         this.soundEnabled = true; // 语音播报开关
 
+        // 音频
+        this._zhVoice = null;       // 预缓存的中文语音
+        this._moveSoundUrl = null;  // 落子 WAV 数据 URI
+        this._captureSoundUrl = null; // 吃子 WAV 数据 URI
+
         // UI 元素引用
         this.canvas = document.getElementById('board-canvas');
         this.board = new BoardRenderer(this.canvas);
@@ -24,6 +29,7 @@ class XiangqiApp {
         this.isAIThinking = false;
 
         this._bindEvents();
+        this._initAudio();
         this._loadSettings();
         this._checkAutoSave();
         this._render();
@@ -174,6 +180,8 @@ class XiangqiApp {
         const moveRecord = this.game.makeMove(fr, fc, tr, tc);
         if (!moveRecord) return;
 
+        // 落子音效
+        this._playMoveSound(moveRecord.captured !== PIECE.EMPTY);
         this._clearSelection();
         this.board.setLastMove({ fr, fc, tr, tc });
         this._addMoveToHistory(moveRecord);
@@ -207,6 +215,8 @@ class XiangqiApp {
         if (move) {
             const moveRecord = this.game.makeMove(move.fr, move.fc, move.tr, move.tc);
             if (moveRecord) {
+                // 落子音效
+                this._playMoveSound(moveRecord.captured !== PIECE.EMPTY);
                 this.board.setLastMove({ fr: move.fr, fc: move.fc, tr: move.tr, tc: move.tc });
                 this._addMoveToHistory(moveRecord);
                 this._announceMove(moveRecord);
@@ -508,14 +518,92 @@ class XiangqiApp {
         document.querySelectorAll('.dialog-overlay').forEach(d => d.classList.remove('active'));
     }
 
+    // ============== 音频初始化 ==============
+
+    _initAudio() {
+        // 预生成落子音效（WAV 数据 URI，避免使用 AudioContext 与 TTS 争抢音频焦点）
+        this._moveSoundUrl = this._buildClickWav(false);
+        this._captureSoundUrl = this._buildClickWav(true);
+
+        // 预加载中文语音（语音列表异步加载，需监听 voiceschanged）
+        if ('speechSynthesis' in window) {
+            const loadVoices = () => {
+                const voices = window.speechSynthesis.getVoices();
+                const zh = voices.find(v => v.lang.startsWith('zh'));
+                if (zh) this._zhVoice = zh;
+            };
+            loadVoices();
+            window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+        }
+    }
+
+    // 用 JS 生成 PCM WAV 数据 URI，不依赖 AudioContext
+    _buildClickWav(isCapture) {
+        const sr = 22050;
+        const ms = isCapture ? 130 : 85;
+        const n = Math.floor(sr * ms / 1000);
+        const buf = new ArrayBuffer(44 + n * 2);
+        const v = new DataView(buf);
+        const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+        ws(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true);
+        ws(8, 'WAVE'); ws(12, 'fmt ');
+        v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+        v.setUint16(22, 1, true);  v.setUint32(24, sr, true);
+        v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true);
+        v.setUint16(34, 16, true); ws(36, 'data'); v.setUint32(40, n * 2, true);
+        for (let i = 0; i < n; i++) {
+            const t = i / sr;
+            const nd = Math.exp(-t / (isCapture ? 0.028 : 0.018));
+            const td = Math.exp(-t / (isCapture ? 0.065 : 0.040));
+            const noise = (Math.random() * 2 - 1) * nd * 0.45;
+            const tone  = Math.sin(2 * Math.PI * (isCapture ? 160 : 300) * t) * td * 0.60;
+            v.setInt16(44 + i * 2, Math.max(-32767, Math.min(32767, (noise + tone) * 32767)) | 0, true);
+        }
+        const bytes = new Uint8Array(buf);
+        let b = '';
+        for (let i = 0; i < bytes.length; i++) b += String.fromCharCode(bytes[i]);
+        return 'data:audio/wav;base64,' + btoa(b);
+    }
+
+    // 棋子落子音效（isCapture: 是否吃子）
+    _playMoveSound(isCapture) {
+        if (!this.soundEnabled) return;
+        const url = isCapture ? this._captureSoundUrl : this._moveSoundUrl;
+        if (!url) return;
+        try {
+            const a = new Audio(url);
+            a.volume = isCapture ? 1.0 : 0.75;
+            a.play().catch(() => {});
+        } catch (e) {}
+    }
+
     // ============== 语音播报 ==============
 
     _announceMove(moveRecord) {
         if (!this.soundEnabled) return;
-        if (!('speechSynthesis' in window)) return;
 
         const text = this._generateFunnyComment(moveRecord);
 
+        // Capacitor 原生平台（Android）：WebView 不支持 speechSynthesis，
+        // 使用 @capacitor-community/text-to-speech 插件调用系统原生 TTS
+        if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+            try {
+                const tts = window.Capacitor.Plugins.TextToSpeech;
+                if (tts) {
+                    tts.speak({
+                        text: text,
+                        lang: 'zh-CN',
+                        rate: 1.0,
+                        pitch: 1.1,
+                        volume: 1.0
+                    }).catch(() => {});
+                    return;
+                }
+            } catch (e) {}
+        }
+
+        // Web 浏览器：使用 speechSynthesis（Chrome 等主流浏览器支持）
+        if (!('speechSynthesis' in window)) return;
         window.speechSynthesis.cancel();
 
         const utterance = new SpeechSynthesisUtterance(text);
@@ -524,10 +612,13 @@ class XiangqiApp {
         utterance.pitch = 1.1;
         utterance.volume = 1.0;
 
-        // 尝试选择中文语音
-        const voices = window.speechSynthesis.getVoices();
-        const zhVoice = voices.find(v => v.lang.startsWith('zh'));
-        if (zhVoice) utterance.voice = zhVoice;
+        if (this._zhVoice) {
+            utterance.voice = this._zhVoice;
+        } else {
+            const voices = window.speechSynthesis.getVoices();
+            const zh = voices.find(v => v.lang.startsWith('zh'));
+            if (zh) { utterance.voice = zh; this._zhVoice = zh; }
+        }
 
         window.speechSynthesis.speak(utterance);
     }

@@ -1,0 +1,12 @@
+{
+  "name": "chinese-chess",
+  "version": "1.0.0",
+  "description": "中国象棋人机对战",
+  "private": true,
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor-community/text-to-speech": "^5.1.0"
+  }
+}
